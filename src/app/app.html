@@ -1,0 +1,265 @@
+<div class="page-shell">
+  <header class="topbar">
+    <div>
+      <h1>{{ tituloApp }}</h1>
+      <p>Conectando clientes e prestadores de servico.</p>
+    </div>
+
+    <nav class="nav-actions">
+      <button type="button" (click)="irPara('home')">Home</button>
+      @if (!logado) {
+      <button type="button" (click)="irPara('login')">Login</button>
+      <button type="button" (click)="irPara('cadastro')">Cadastro</button>
+      }
+
+      @if (logado) {
+      <button type="button" (click)="irPara('perfil')">Perfil</button>
+      <button type="button" (click)="abrirChat()">Chat</button>
+      @if (ehVendedor) {
+      <button type="button" (click)="irPara('servico')">Meu servico</button>
+      }
+      <button type="button" class="danger" (click)="sair()">Sair</button>
+      }
+    </nav>
+  </header>
+
+  @if (usuarioAtual(); as usuario) {
+  <section class="status-box info">
+    Logado como <strong>{{ usuario.nome }}</strong> ({{ usuario.perfil }}).
+  </section>
+  }
+
+  @if (telaAtual() === 'home') {
+  <section class="card">
+    <div class="card-head">
+      <h2>Servicos disponiveis</h2>
+      <button type="button" (click)="recarregarHome()">Atualizar</button>
+    </div>
+
+    @if (servicos().length === 0) {
+    <p>Nenhum servico cadastrado no momento.</p>
+    }
+
+    <div class="service-grid">
+      @for (servico of servicos(); track servico.id) {
+      <article class="service-card">
+        <div class="service-card-head">
+          <h3>{{ servico.titulo }}</h3>
+          @if (ehMeuServico(servico)) {
+          <span class="service-badge">Seu servico</span>
+          }
+        </div>
+        @if (servico.fotoServicoBase64) {
+        <img [src]="servico.fotoServicoBase64" alt="Foto do servico" />
+        }
+        <p><strong>Categoria:</strong> {{ servico.categoria }}</p>
+        <p>{{ servico.descricao }}</p>
+        @if (ehMeuServico(servico)) {
+        <p class="service-note">Este anuncio pertence ao seu perfil.</p>
+        }
+        @if (logado && ehVendedor && !ehMeuServico(servico)) {
+        <p class="service-note">Prestadores nao enviam mensagens para outros prestadores.</p>
+        }
+        @if (podeEnviarMensagemParaServico(servico)) {
+        <button type="button" (click)="iniciarConversaPorServico(servico)">Enviar mensagem</button>
+        }
+      </article>
+      }
+    </div>
+  </section>
+  }
+
+  @if (telaAtual() === 'login') {
+  <section class="card form-card">
+    <h2>Entrar</h2>
+    <label>
+      Email
+      <input type="email" [(ngModel)]="loginForm.email" placeholder="seuemail@dominio.com" />
+    </label>
+    <label>
+      Senha
+      <input type="password" [(ngModel)]="loginForm.password" placeholder="Digite sua senha" />
+    </label>
+    <button type="button" (click)="entrar()">Entrar</button>
+  </section>
+  }
+
+  @if (telaAtual() === 'cadastro') {
+  <section class="card form-card">
+    <h2>Criar conta</h2>
+    <label>
+      Nome
+      <input type="text" [(ngModel)]="cadastroForm.nome" placeholder="Seu nome" />
+    </label>
+    <label>
+      Email
+      <input type="email" [(ngModel)]="cadastroForm.email" placeholder="seuemail@dominio.com" />
+    </label>
+    <label>
+      Senha
+      <input type="password" [(ngModel)]="cadastroForm.password" placeholder="Crie uma senha" />
+    </label>
+
+    <label>
+      Perfil
+      <select [(ngModel)]="cadastroForm.perfil">
+        <option value="cliente">Cliente</option>
+        <option value="vendedor">Vendedor</option>
+      </select>
+    </label>
+
+    <label>
+      Foto de perfil
+      <input type="file" accept="image/*" (change)="onFotoPerfilSelecionada($event)" />
+    </label>
+
+    @if (previewFotoPerfil()) {
+    <img class="preview" [src]="previewFotoPerfil()" alt="Preview foto de perfil" />
+    }
+
+    <button type="button" (click)="cadastrar()">Cadastrar</button>
+  </section>
+  }
+
+  @if (telaAtual() === 'perfil') {
+  <section class="card form-card">
+    <h2>Editar perfil</h2>
+    @if (!usuarioAtual()) {
+    <p>Voce precisa estar logado para editar perfil.</p>
+    } @else {
+    <label>
+      Nome
+      <input type="text" [(ngModel)]="perfilForm.nome" />
+    </label>
+
+    <label>
+      Perfil
+      <select [(ngModel)]="perfilForm.perfil">
+        <option value="cliente">Cliente</option>
+        <option value="vendedor">Vendedor</option>
+      </select>
+    </label>
+
+    <label>
+      Foto de perfil
+      <input type="file" accept="image/*" (change)="onFotoPerfilSelecionada($event)" />
+    </label>
+
+    @if (previewFotoPerfil()) {
+    <img class="preview" [src]="previewFotoPerfil()" alt="Preview foto de perfil" />
+    }
+
+    <button type="button" (click)="salvarPerfil()">Salvar perfil</button>
+    }
+  </section>
+  }
+
+  @if (telaAtual() === 'servico') {
+  <section class="card form-card">
+    <h2>Meu servico</h2>
+
+    @if (!ehVendedor) {
+    <p>Apenas perfil vendedor pode cadastrar servico.</p>
+    } @else {
+    <label>
+      Titulo do servico
+      <input type="text" [(ngModel)]="servicoForm.titulo" placeholder="Ex: Eletricista residencial" />
+    </label>
+
+    <label>
+      Categoria
+      <input type="text" [(ngModel)]="servicoForm.categoria" placeholder="Ex: manutencao" />
+    </label>
+
+    <label>
+      Descricao
+      <textarea rows="4" [(ngModel)]="servicoForm.descricao" placeholder="Descreva seu servico"></textarea>
+    </label>
+
+    <label>
+      Foto do servico
+      <input type="file" accept="image/*" (change)="onFotoServicoSelecionada($event)" />
+    </label>
+
+    @if (previewFotoServico()) {
+    <img class="preview" [src]="previewFotoServico()" alt="Preview foto do servico" />
+    }
+
+    <div class="row-actions">
+      <button type="button" (click)="salvarServico()">
+        {{ meuServico() ? 'Atualizar servico' : 'Cadastrar servico' }}
+      </button>
+      @if (meuServico()) {
+      <button type="button" class="danger" (click)="excluirMeuServico()">Excluir servico</button>
+      }
+    </div>
+    }
+  </section>
+  }
+
+  @if (telaAtual() === 'chat') {
+  <section class="card chat-layout">
+    <div class="chat-list">
+      <div class="card-head">
+        <h2>Conversas</h2>
+        <button type="button" (click)="carregarConversasTela()">Atualizar</button>
+      </div>
+
+      @if (!usuarioAtual()) {
+      <p>Entre na conta para usar o chat.</p>
+      }
+
+      @for (item of conversas(); track item.conversa.id) {
+      <button type="button" class="chat-item" [class.active]="conversaSelecionada()?.conversa?.id === item.conversa.id"
+        (click)="abrirConversa(item)">
+        <strong>{{ item.outroNome }}</strong>
+        <span>{{ item.servicoTitulo }}</span>
+      </button>
+      }
+    </div>
+
+    <div class="chat-window">
+      @if (!conversaSelecionada()) {
+      <p>Selecione uma conversa para ver as mensagens.</p>
+      } @else {
+      <h3>{{ conversaSelecionada()?.outroNome }} - {{ conversaSelecionada()?.servicoTitulo }}</h3>
+      <div class="messages-box">
+        @for (mensagem of mensagens(); track mensagem.id) {
+        <article class="message-item">
+          <header>
+            <strong>{{ nomeRemetente(mensagem.remetenteId) }}</strong>
+            <span>{{ dataMensagem(mensagem.createdAt) }}</span>
+          </header>
+          <p>{{ mensagem.texto }}</p>
+        </article>
+        }
+      </div>
+
+      <label>
+        Mensagem
+        <textarea rows="3" [(ngModel)]="mensagemTexto" placeholder="Digite sua mensagem"></textarea>
+      </label>
+      <button type="button" (click)="enviarMensagem()">Enviar</button>
+      }
+    </div>
+  </section>
+  }
+
+  @if (loading()) {
+  <div class="loading-overlay">
+    <div class="loading-card">
+      <p>Carregando...</p>
+    </div>
+  </div>
+  }
+
+  <section class="toast-container" aria-live="polite" aria-atomic="true">
+    @for (toast of toasts(); track toast.id) {
+    <article class="toast-item" [class.toast-error]="toast.tipo === 'error'"
+      [class.toast-success]="toast.tipo === 'success'" [class.toast-info]="toast.tipo === 'info'">
+      <p>{{ toast.texto }}</p>
+      <button type="button" class="toast-close" (click)="fecharToast(toast.id)">Fechar</button>
+    </article>
+    }
+  </section>
+</div>
