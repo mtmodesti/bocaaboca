@@ -469,8 +469,10 @@ export class App implements OnInit {
 
     try {
       this.fotoPerfilBase64 = await this.gerarImagemLeveBase64(arquivo, 420, 0.72);
-    } catch {
-      this.showError('Nao foi possivel processar a foto de perfil. Use outra imagem.');
+    } catch (error) {
+      console.error('Erro ao processar foto de perfil:', error);
+      const mensagem = error instanceof Error ? error.message : 'Imagem invalida ou corrompida.';
+      this.showError(`Nao foi possivel processar a foto de perfil. ${mensagem}`);
     }
   }
 
@@ -482,8 +484,10 @@ export class App implements OnInit {
 
     try {
       this.fotoServicoBase64 = await this.gerarImagemLeveBase64(arquivo, 640, 0.74);
-    } catch {
-      this.showError('Nao foi possivel processar a foto do servico. Use outra imagem.');
+    } catch (error) {
+      console.error('Erro ao processar foto do servico:', error);
+      const mensagem = error instanceof Error ? error.message : 'Imagem invalida ou corrompida.';
+      this.showError(`Nao foi possivel processar a foto do servico. ${mensagem}`);
     }
   }
 
@@ -816,6 +820,14 @@ export class App implements OnInit {
   }
 
   private async gerarImagemLeveBase64(file: File, maxSize: number, quality: number): Promise<string> {
+    if (!file || file.size <= 0) {
+      throw new Error('Arquivo vazio.');
+    }
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('O arquivo selecionado nao e uma imagem valida.');
+    }
+
     const dataUrl = await this.fileToDataUrl(file);
     return this.resizeDataUrl(dataUrl, maxSize, quality);
   }
@@ -823,7 +835,14 @@ export class App implements OnInit {
   private async fileToDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        if (!result) {
+          reject(new Error('Arquivo de imagem vazio ou ilegivel.'));
+          return;
+        }
+        resolve(result);
+      };
       reader.onerror = () => reject(new Error('Nao foi possivel ler o arquivo de imagem.'));
       reader.readAsDataURL(file);
     });
@@ -843,14 +862,23 @@ export class App implements OnInit {
         const context = canvas.getContext('2d');
 
         if (!context) {
-          reject(new Error('Nao foi possivel processar a imagem.'));
+          reject(new Error('O navegador nao conseguiu criar o contexto da imagem.'));
           return;
         }
 
-        context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        try {
+          context.drawImage(image, 0, 0, width, height);
+          const output = canvas.toDataURL('image/jpeg', quality);
+          if (!output || output === 'data:,') {
+            reject(new Error('A imagem gerada ficou vazia.'));
+            return;
+          }
+          resolve(output);
+        } catch {
+          reject(new Error('A imagem selecionada nao pode ser convertida para o formato de perfil.'));
+        }
       };
-      image.onerror = () => reject(new Error('Imagem invalida.'));
+      image.onerror = () => reject(new Error('Imagem invalida, corrompida ou em formato nao suportado pelo navegador.'));
       image.src = dataUrl;
     });
   }
